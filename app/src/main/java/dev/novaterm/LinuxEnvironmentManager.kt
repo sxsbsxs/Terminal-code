@@ -163,10 +163,15 @@ class LinuxEnvironmentManager(context: Context) {
                 }
 
                 linuxWorkingDirectory = "/root"
+                val smokeTest = execute("printf NOVATERM_ROOTFS_OK")
+                check(smokeTest.exitCode == 0 && smokeTest.output.contains("NOVATERM_ROOTFS_OK")) {
+                    File(rootfsDir, ".novaterm-rootfs-version").delete()
+                    "PRoot 已安装，但 Debian 启动测试失败：${smokeTest.output}"
+                }
                 _progress.value = LinuxInstallProgress(
                     LinuxInstallStage.READY,
                     1f,
-                    "Debian Bookworm ARM64 已安装"
+                    "Debian Bookworm ARM64 已安装并通过启动测试"
                 )
                 Result.success(Unit)
             } catch (error: kotlinx.coroutines.CancellationException) {
