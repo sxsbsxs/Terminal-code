@@ -447,15 +447,11 @@ class LinuxEnvironmentManager(context: Context) {
 
                     entry.isSymbolicLink -> {
                         output.parentFile?.mkdirs()
-                        runCatching {
-                            if (output.exists() || java.nio.file.Files.isSymbolicLink(output.toPath())) {
-                                output.delete()
-                            }
-                            java.nio.file.Files.createSymbolicLink(
-                                output.toPath(),
-                                java.nio.file.Paths.get(entry.linkName)
-                            )
-                        }
+                        java.nio.file.Files.deleteIfExists(output.toPath())
+                        java.nio.file.Files.createSymbolicLink(
+                            output.toPath(),
+                            java.nio.file.Paths.get(entry.linkName)
+                        )
                     }
 
                     entry.isLink -> {
