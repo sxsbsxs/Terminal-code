@@ -183,7 +183,7 @@ private fun Header(page: AppPage) {
         }
         AssistChip(
             onClick = {},
-            label = { Text("DEV 0.1.0", fontSize = 10.sp) }
+            label = { Text("DEV 0.2.0", fontSize = 10.sp) }
         )
     }
 }
@@ -193,7 +193,7 @@ private fun TerminalPage(shell: ShellSession, linux: LinuxEnvironmentManager) {
     var useLinux by remember { mutableStateOf(linux.isInstalled) }
     val lines = remember {
         mutableStateListOf(
-            ConsoleLine("NovaTerm 0.1.0  ·  Android workspace"),
+            ConsoleLine("NovaTerm 0.2.0  ·  Android workspace"),
             ConsoleLine("当前为 Android app shell，不是 root 或 Debian/Ubuntu。"),
             ConsoleLine("输入 help 查看可用内置命令。")
         )
