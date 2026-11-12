@@ -67,6 +67,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -119,6 +120,7 @@ private fun NovaTermApp() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val shell = remember { ShellSession(context) }
     val linux = remember { LinuxEnvironmentManager(context) }
+    val appScope = rememberCoroutineScope()
     var page by remember { mutableStateOf(AppPage.Terminal) }
 
     Scaffold(
@@ -152,7 +154,7 @@ private fun NovaTermApp() {
             when (page) {
                 AppPage.Terminal -> TerminalPage(shell, linux)
                 AppPage.Files -> FilesPage(shell.workspace)
-                AppPage.Environment -> EnvironmentPage(linux)
+                AppPage.Environment -> EnvironmentPage(linux, appScope)
                 AppPage.Settings -> SettingsPage(shell.workspace.absolutePath)
             }
         }
@@ -416,9 +418,8 @@ private fun FilesPage(workspace: File) {
 }
 
 @Composable
-private fun EnvironmentPage(linux: LinuxEnvironmentManager) {
+private fun EnvironmentPage(linux: LinuxEnvironmentManager, appScope: CoroutineScope) {
     val progress by linux.progress.collectAsState()
-    val scope = rememberCoroutineScope()
     val installed = linux.isInstalled
     val busy = progress.stage == LinuxInstallStage.DOWNLOADING_PROOT ||
         progress.stage == LinuxInstallStage.DOWNLOADING_ROOTFS ||
@@ -488,7 +489,7 @@ private fun EnvironmentPage(linux: LinuxEnvironmentManager) {
                     Text("进入「终端」，选择 DEBIAN 即可执行 Linux 命令。", color = Mint, fontSize = 11.sp)
                 } else {
                     Button(
-                        onClick = { scope.launch { linux.install() } },
+                        onClick = { appScope.launch { linux.install() } },
                         enabled = linux.isSupported && !busy,
                         modifier = Modifier.fillMaxWidth()
                     ) {
