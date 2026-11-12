@@ -467,10 +467,16 @@ private fun EnvironmentPage(linux: LinuxEnvironmentManager) {
                     lineHeight = 18.sp
                 )
                 if (busy) {
-                    LinearProgressIndicator(
-                        progress = progress.fraction.coerceIn(0f, 1f),
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    if (progress.stage == LinuxInstallStage.EXTRACTING ||
+                        progress.stage == LinuxInstallStage.VERIFYING
+                    ) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    } else {
+                        LinearProgressIndicator(
+                            progress = progress.fraction.coerceIn(0f, 1f),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                     Text(progress.message, color = Mint, fontSize = 11.sp)
                 }
                 if (progress.stage == LinuxInstallStage.FAILED && progress.error != null) {
@@ -540,7 +546,7 @@ private fun SettingsPage(workspacePath: String) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("应用设置", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        SettingRow("版本", "0.1.0 · Early development")
+        SettingRow("版本", "0.2.0 · Early development")
         SettingRow("Android Shell", "/system/bin/sh")
         SettingRow("Linux 环境", "Debian Bookworm ARM64 · PRoot")
         SettingRow("工作区", workspacePath)
