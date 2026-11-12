@@ -479,8 +479,9 @@ private fun EnvironmentPage(linux: LinuxEnvironmentManager) {
                     }
                     Text(progress.message, color = Mint, fontSize = 11.sp)
                 }
-                if (progress.stage == LinuxInstallStage.FAILED && progress.error != null) {
-                    Text(progress.error, color = Color(0xFFFF9B91), fontSize = 11.sp)
+                val errorMessage = progress.error
+                if (progress.stage == LinuxInstallStage.FAILED && errorMessage != null) {
+                    Text(errorMessage, color = Color(0xFFFF9B91), fontSize = 11.sp)
                 }
                 if (installed) {
                     Text("安装目录：${linux.rootfsPath}", color = Muted, fontSize = 10.sp)
