@@ -1,6 +1,7 @@
 package dev.novaterm
 
 import android.content.Context
+import android.net.ConnectivityManager
 import android.os.Build
 import android.system.Os
 import java.io.BufferedInputStream
@@ -56,6 +57,8 @@ class LinuxEnvironmentManager(context: Context) {
     private val prootZip = File(baseDir, "proot-aarch64.zip")
     private val rootfsArchive = File(baseDir, "debian-bookworm-arm64.tar.gz")
     private val temporaryRootfs = File(baseDir, "debian-bookworm-arm64.installing")
+    private val resolverConfig = File(baseDir, "resolv.conf")
+    private val temporaryDirectory = File(baseDir, "tmp")
     private val installMutex = Mutex()
 
     private val _progress = MutableStateFlow(LinuxInstallProgress())
@@ -241,6 +244,8 @@ class LinuxEnvironmentManager(context: Context) {
 
         val outputFile = File.createTempFile("novaterm-linux-", ".log", appContext.cacheDir)
         try {
+            refreshResolverConfig()
+            temporaryDirectory.mkdirs()
             val args = mutableListOf(
                 prootBinary.absolutePath,
                 "-0",
@@ -249,6 +254,8 @@ class LinuxEnvironmentManager(context: Context) {
                 "-b", "/dev",
                 "-b", "/proc",
                 "-b", "/sys",
+                "-b", "${temporaryDirectory.absolutePath}:/tmp",
+                "-b", "${resolverConfig.absolutePath}:/etc/resolv.conf",
                 "-w", linuxWorkingDirectory,
                 "/usr/bin/env",
                 "-i",
@@ -295,6 +302,27 @@ class LinuxEnvironmentManager(context: Context) {
             ShellResult("PRoot 执行失败：${error.message ?: error::class.java.simpleName}", 127)
         } finally {
             outputFile.delete()
+        }
+    }
+
+    private fun refreshResolverConfig() {
+        val manager = appContext.getSystemService(ConnectivityManager::class.java)
+        val dnsServers = runCatching {
+            manager.activeNetwork?.let { network ->
+                manager.getLinkProperties(network)?.dnsServers
+            }.orEmpty()
+                .mapNotNull { it.hostAddress?.substringBefore('%') }
+                .filter { it.isNotBlank() }
+                .distinct()
+        }.getOrDefault(emptyList())
+
+        if (dnsServers.isNotEmpty()) {
+            resolverConfig.writeText(
+                dnsServers.joinToString(separator = "\n", postfix = "\n") { "nameserver $it" }
+            )
+        } else if (!resolverConfig.isFile) {
+            // Do not guess a public resolver when the system network has not supplied one.
+            resolverConfig.writeText("# No active Android network DNS servers are available.\n")
         }
     }
 
