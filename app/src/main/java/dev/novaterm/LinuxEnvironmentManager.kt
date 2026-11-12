@@ -75,6 +75,9 @@ class LinuxEnvironmentManager(context: Context) {
             (File(rootfsDir, "usr/bin/bash").isFile || File(rootfsDir, "bin/bash").exists()) &&
             File(rootfsDir, ".novaterm-rootfs-version").isFile
 
+    val rootfsPath: String
+        get() = rootfsDir.absolutePath
+
     fun prompt(): String = "debian:$linuxWorkingDirectory#"
 
     suspend fun install(): Result<Unit> = withContext(Dispatchers.IO) {
@@ -166,7 +169,10 @@ class LinuxEnvironmentManager(context: Context) {
                     "Debian Bookworm ARM64 已安装"
                 )
                 Result.success(Unit)
-            } catch (error: Throwable) {
+            } catch (error: kotlinx.coroutines.CancellationException) {
+                temporaryRootfs.deleteRecursively()
+                throw error
+            } catch (error: Exception) {
                 temporaryRootfs.deleteRecursively()
                 _progress.value = LinuxInstallProgress(
                     LinuxInstallStage.FAILED,
@@ -468,7 +474,7 @@ class LinuxEnvironmentManager(context: Context) {
     }
 
     private fun safeArchiveTarget(root: File, entryName: String): File? {
-        val normalizedName = entryName.replace('\\\\', '/').removePrefix("./")
+        val normalizedName = entryName.replace(92.toChar(), '/').removePrefix("./")
         if (normalizedName.isBlank() || normalizedName.startsWith("/")) return null
         val segments = normalizedName.split('/')
         if (segments.any { it == ".." }) return null
