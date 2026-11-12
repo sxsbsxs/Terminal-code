@@ -62,4 +62,4 @@ Every push to `main` or `master` and every pull request targeting those branches
 
 ## License
 
-GPL-3.0-or-later. See [LICENSE](LICENSE) and the [GNU license text](https://www.gnu.org/licenses/gpl-3.0.txt).
+GPL-3.0-only. See [LICENSE](LICENSE) and the [GNU license text](https://www.gnu.org/licenses/gpl-3.0.txt).
