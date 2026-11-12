@@ -391,10 +391,33 @@ class LinuxEnvironmentManager(context: Context) {
         check(binary.isFile) { "PRoot 压缩包中没有 proot 可执行文件。" }
         runCatching { Os.chmod(binary.absolutePath, 448) }
         binary.setExecutable(true, false)
+        verifyProotBinary(binary, newRuntime)
 
         if (runtimeDir.exists()) runtimeDir.deleteRecursively()
         check(newRuntime.renameTo(runtimeDir)) { "无法安装 PRoot 运行时。" }
         prootZip.delete()
+    }
+
+    private fun verifyProotBinary(binary: File, runtimeLocation: File) {
+        val output = File.createTempFile("novaterm-proot-check-", ".txt", appContext.cacheDir)
+        try {
+            val process = ProcessBuilder(binary.absolutePath, "--version")
+                .directory(runtimeLocation)
+                .redirectErrorStream(true)
+                .redirectOutput(output)
+                .start()
+            val finished = process.waitFor(15, java.util.concurrent.TimeUnit.SECONDS)
+            if (!finished) {
+                process.destroyForcibly()
+                error("PRoot 启动测试超时。")
+            }
+            val versionOutput = runCatching { output.readText() }.getOrDefault("")
+            check(process.exitValue() == 0 && versionOutput.contains("proot", ignoreCase = true)) {
+                "PRoot 二进制无法在此设备启动：$versionOutput"
+            }
+        } finally {
+            output.delete()
+        }
     }
 
     private fun extractRootfs(archive: File, destination: File) {
