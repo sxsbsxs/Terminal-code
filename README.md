@@ -1,24 +1,47 @@
 # NovaTerm
 
-**NovaTerm** is an open-source Android terminal workspace built with Kotlin and Jetpack Compose. Its design combines a modern Android interface with a developer-focused terminal.
+**NovaTerm** is an open-source Android terminal workspace built with Kotlin and Jetpack Compose. It combines a modern Android interface with a developer-focused terminal and an optional rootless Debian environment.
 
-> **Current status: early development (0.1.0).** The app shell, local Android command runner, private workspace browser and GitHub Actions APK build are in this repository. It is not yet a full Termux replacement: Debian/Ubuntu proot, apt, SSH, Python packages and persistent PTY sessions are roadmap items.
+> **Current status: early development (0.2.0).** The app now has an on-demand PRoot + Debian Bookworm ARM64 installer, SHA-256 verification, a first command runner for Debian, and a GitHub Actions debug APK pipeline. It is still an early prototype: persistent interactive PTY sessions, multiple terminal tabs, graphical package management and other CPU architectures are not ready.
 
 ## Current features
 
 - Kotlin + Jetpack Compose / Material 3 interface
-- Dark hybrid layout with Terminal, Files, Environment and Settings sections
-- Commands executed by Android's `/system/bin/sh`
-- App-private workspace with a persistent `cd` working directory
-- Built-in `help`, `pwd`, `cd` and `clear` commands
-- Command timeout and output truncation safeguards
+- Terminal, Files, Environment and Settings sections
+- Android app-local shell via `/system/bin/sh`
+- App-private workspace and working-directory handling
+- On-demand Android ARM64 PRoot runtime download with SHA-256 verification
+- On-demand Debian Bookworm ARM64 root filesystem download with SHA-256 verification
+- Safe first-run extraction into app-private storage
+- Debian commands launched through PRoot with app-private rootfs and isolated HOME
 - GitHub Actions builds a debug APK and publishes it as a workflow artifact
+
+## Install the Linux environment
+
+1. Install the NovaTerm APK.
+2. Open **Environment** and press **Install Debian Bookworm**.
+3. Keep the app open and wait for the PRoot and Debian archives to be downloaded, verified and extracted.
+4. Open **Terminal** and switch from **ANDROID** to **DEBIAN**.
+5. Run:
+
+```bash
+apt update
+apt install -y python3 git openssh-client
+python3 --version
+git --version
+```
+
+The initial Debian archive is about 48 MB compressed; the extracted root filesystem needs substantially more internal storage. The current installer supports `arm64-v8a` only.
 
 ## Important limitations
 
-The current shell runs with the normal Android application UID. It is **not root**, does not unlock Android system partitions, and does not include a Debian or Ubuntu filesystem. The file browser currently shows only NovaTerm's private workspace. Interactive full-screen terminal apps, multi-session PTY, package installation, SSH and Linux distributions are not implemented yet.
+- PRoot's simulated root identity is **not Android root**. NovaTerm does not gain access to Android system partitions.
+- Debian currently runs one command per process. A persistent PTY shell, interactive editors, terminal job control and multiple sessions are not implemented yet.
+- The current file browser shows NovaTerm's app-private workspace. Android shared storage integration through the Storage Access Framework is planned.
+- Python, Git and SSH are installed inside Debian with `apt`; they are not bundled in the APK.
+- The Debian installer is pinned to a Debian Bookworm rootfs snapshot and a PRoot release checksum. A successful source commit does not mean that the runtime has already been tested on every device. Please report device-specific startup failures with the Android version and ABI.
 
-See [the roadmap](docs/ROADMAP.md) for planned milestones.
+See [the roadmap](docs/ROADMAP.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
 
 ## Build
 
@@ -51,15 +74,17 @@ Every push to `main` or `master` and every pull request targeting those branches
 │   └── src/main/
 │       ├── java/dev/novaterm/
 │       │   ├── MainActivity.kt
-│       │   └── ShellSession.kt
+│       │   ├── ShellSession.kt
+│       │   └── LinuxEnvironmentManager.kt
 │       └── AndroidManifest.xml
 ├── .github/workflows/android.yml
 ├── docs/ROADMAP.md
 ├── CONTRIBUTING.md
+├── THIRD_PARTY_NOTICES.md
 ├── LICENSE
 └── settings.gradle.kts
 ```
 
 ## License
 
-GPL-3.0-only. See [LICENSE](LICENSE) and the [GNU license text](https://www.gnu.org/licenses/gpl-3.0.txt).
+NovaTerm application code is GPL-3.0-only. Separately downloaded third-party runtime components retain their own licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
