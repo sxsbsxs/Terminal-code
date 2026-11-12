@@ -193,9 +193,9 @@ private fun TerminalPage(shell: ShellSession, linux: LinuxEnvironmentManager) {
     var useLinux by remember { mutableStateOf(linux.isInstalled) }
     val lines = remember {
         mutableStateListOf(
-            ConsoleLine("NovaTerm 0.2.0  ·  Android workspace"),
-            ConsoleLine("当前为 Android app shell，不是 root 或 Debian/Ubuntu。"),
-            ConsoleLine("输入 help 查看可用内置命令。")
+            ConsoleLine("NovaTerm 0.2.0  ·  Android + Linux workspace"),
+            ConsoleLine("在上方切换 ANDROID 与 DEBIAN 终端环境。"),
+            ConsoleLine("输入 help 查看当前环境的可用命令。")
         )
     }
     var input by remember { mutableStateOf("") }
