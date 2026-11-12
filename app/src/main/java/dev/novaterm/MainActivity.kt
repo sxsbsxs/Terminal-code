@@ -42,6 +42,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -49,6 +50,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -116,6 +118,7 @@ private data class ConsoleLine(val text: String, val command: Boolean = false, v
 private fun NovaTermApp() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val shell = remember { ShellSession(context) }
+    val linux = remember { LinuxEnvironmentManager(context) }
     var page by remember { mutableStateOf(AppPage.Terminal) }
 
     Scaffold(
@@ -147,9 +150,9 @@ private fun NovaTermApp() {
         ) {
             Header(page)
             when (page) {
-                AppPage.Terminal -> TerminalPage(shell)
+                AppPage.Terminal -> TerminalPage(shell, linux)
                 AppPage.Files -> FilesPage(shell.workspace)
-                AppPage.Environment -> EnvironmentPage()
+                AppPage.Environment -> EnvironmentPage(linux)
                 AppPage.Settings -> SettingsPage(shell.workspace.absolutePath)
             }
         }
@@ -186,7 +189,8 @@ private fun Header(page: AppPage) {
 }
 
 @Composable
-private fun TerminalPage(shell: ShellSession) {
+private fun TerminalPage(shell: ShellSession, linux: LinuxEnvironmentManager) {
+    var useLinux by remember { mutableStateOf(linux.isInstalled) }
     val lines = remember {
         mutableStateListOf(
             ConsoleLine("NovaTerm 0.1.0  ·  Android workspace"),
@@ -205,7 +209,7 @@ private fun TerminalPage(shell: ShellSession) {
         lines.add(ConsoleLine("$ $command", command = true))
         running = true
         scope.launch {
-            val result = shell.execute(command)
+            val result = if (useLinux) linux.execute(command) else shell.execute(command)
             if (result.clearScreen) {
                 lines.clear()
             } else {
@@ -234,7 +238,15 @@ private fun TerminalPage(shell: ShellSession) {
         ) {
             Box(Modifier.size(7.dp).background(Mint, CircleShape))
             Spacer(Modifier.width(7.dp))
-            Text("LOCAL SHELL", color = Mint, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            AssistChip(
+                onClick = { useLinux = false },
+                label = { Text("ANDROID", fontSize = 10.sp) }
+            )
+            AssistChip(
+                onClick = { useLinux = true },
+                enabled = linux.isInstalled,
+                label = { Text("DEBIAN", fontSize = 10.sp) }
+            )
             Spacer(Modifier.weight(1f))
             Text(if (running) "执行中…" else "就绪", color = Muted, fontSize = 11.sp)
             IconButton(onClick = { lines.clear() }) {
@@ -306,7 +318,7 @@ private fun TerminalPage(shell: ShellSession) {
             }
         }
         Text(
-            text = shell.prompt(),
+            text = if (useLinux) linux.prompt() else shell.prompt(),
             modifier = Modifier.padding(start = 4.dp, top = 6.dp),
             color = Muted,
             fontSize = 10.sp,
@@ -404,7 +416,15 @@ private fun FilesPage(workspace: File) {
 }
 
 @Composable
-private fun EnvironmentPage() {
+private fun EnvironmentPage(linux: LinuxEnvironmentManager) {
+    val progress by linux.progress.collectAsState()
+    val scope = rememberCoroutineScope()
+    val installed = linux.isInstalled
+    val busy = progress.stage == LinuxInstallStage.DOWNLOADING_PROOT ||
+        progress.stage == LinuxInstallStage.DOWNLOADING_ROOTFS ||
+        progress.stage == LinuxInstallStage.VERIFYING ||
+        progress.stage == LinuxInstallStage.EXTRACTING
+
     Column(
         Modifier.fillMaxSize().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -416,20 +436,70 @@ private fun EnvironmentPage() {
             status = "可用",
             active = true
         )
-        EnvironmentCard(
-            title = "Debian / Ubuntu",
-            description = "计划通过 proot 提供 rootless Linux 用户空间，包含 apt、基础工具和独立 HOME。",
-            status = "开发中",
-            active = false
-        )
+
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Panel),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Debian Bookworm", color = Color.White, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    AssistChip(
+                        onClick = {},
+                        label = {
+                            Text(
+                                when {
+                                    installed -> "已安装"
+                                    busy -> "安装中"
+                                    progress.stage == LinuxInstallStage.FAILED -> "失败"
+                                    !linux.isSupported -> "不支持"
+                                    else -> "ARM64"
+                                },
+                                fontSize = 10.sp
+                            )
+                        }
+                    )
+                }
+                Text(
+                    "真正的 Debian ARM64 用户空间，通过 PRoot 在应用内部运行。安装后可使用 apt 安装 Python、Git、SSH 等工具；不会获取 Android Root 权限。",
+                    color = Muted,
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp
+                )
+                if (busy) {
+                    LinearProgressIndicator(
+                        progress = progress.fraction.coerceIn(0f, 1f),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text(progress.message, color = Mint, fontSize = 11.sp)
+                }
+                if (progress.stage == LinuxInstallStage.FAILED && progress.error != null) {
+                    Text(progress.error, color = Color(0xFFFF9B91), fontSize = 11.sp)
+                }
+                if (installed) {
+                    Text("安装目录：${linux.rootfsPath}", color = Muted, fontSize = 10.sp)
+                    Text("进入「终端」，选择 DEBIAN 即可执行 Linux 命令。", color = Mint, fontSize = 11.sp)
+                } else {
+                    Button(
+                        onClick = { scope.launch { linux.install() } },
+                        enabled = linux.isSupported && !busy,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (progress.stage == LinuxInstallStage.FAILED) "重试安装 Debian" else "安装 Debian Bookworm")
+                    }
+                }
+            }
+        }
+
         EnvironmentCard(
             title = "开发工具链",
-            description = "Python、Git、编译工具与 SSH 将作为可选组件接入 Linux 用户空间。",
-            status = "规划中",
-            active = false
+            description = "Debian 安装完成后，可在终端执行 apt update，再安装 python3、git、openssh-client 等软件包。",
+            status = if (installed) "可安装" else "等待 Debian",
+            active = installed
         )
+
         Text(
-            "说明：当前版本不会伪装成完整 Linux。后续 Linux 环境需要经过校验的 rootfs、proot 二进制和安装/更新流程。",
+            "首次安装需要联网下载约 48 MB 的 Debian 压缩文件，解压后会占用更多内部存储空间。当前此安装器优先支持 arm64-v8a 设备。",
             color = Muted,
             fontSize = 12.sp,
             lineHeight = 18.sp
@@ -471,11 +541,12 @@ private fun SettingsPage(workspacePath: String) {
     ) {
         Text("应用设置", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         SettingRow("版本", "0.1.0 · Early development")
-        SettingRow("默认 Shell", "/system/bin/sh")
+        SettingRow("Android Shell", "/system/bin/sh")
+        SettingRow("Linux 环境", "Debian Bookworm ARM64 · PRoot")
         SettingRow("工作区", workspacePath)
-        SettingRow("权限模型", "Android app UID · 非 Root")
+        SettingRow("权限模型", "Android app UID · PRoot 模拟 root")
         Text(
-            "NovaTerm 是一个独立开源项目。终端命令由 Android 系统 Shell 执行，不具备 Termux 的完整 Linux 用户空间能力。",
+            "Debian 命令运行在应用私有目录中的 rootfs 里；PRoot 的 root 是用户空间模拟，不是 Android 系统 Root。",
             color = Muted,
             fontSize = 12.sp,
             lineHeight = 18.sp
